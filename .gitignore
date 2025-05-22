@@ -1,0 +1,13 @@
+test_chatbot.py
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+.env
+chat_logs/
+
+.vscode/
+
