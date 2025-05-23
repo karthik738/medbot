@@ -1,9 +1,10 @@
 import os
 import re
 import json
-import pyttsx3
 import requests
 from datetime import datetime
+from gtts import gTTS
+from tempfile import NamedTemporaryFile
 from dotenv import load_dotenv
 
 # === ENV SETUP ===
@@ -33,11 +34,7 @@ MODEL = "anthropic/claude-3-haiku"
 #     global tts_enabled
 #     tts_enabled = enabled
 
-# speech_engine.py
-import os
-from gtts import gTTS
-from tempfile import NamedTemporaryFile
-
+# === TTS SETUP ===
 tts_enabled = True
 tts_supported = os.getenv("SPACE_ENVIRONMENT") != "huggingface"
 
@@ -48,7 +45,6 @@ def set_tts(enabled: bool):
 def speak(text: str):
     if not tts_enabled or not tts_supported:
         return
-
     try:
         tts = gTTS(text)
         with NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
@@ -57,7 +53,6 @@ def speak(text: str):
             os.remove(tmp.name)
     except Exception as e:
         print(f"[TTS Error] {str(e)}")
-
 
 # === SESSION SAVE ===
 SAVE_DIR = "chat_logs"
@@ -71,14 +66,12 @@ def save_chat_session(responses: dict, messages: list, recommendation: str):
     session_data = {
         "timestamp": timestamp,
         "user_responses": responses,
-        "chat_history": [{"user": u, "bot": b} for u, b in messages],
+        "chat_history": messages,
         "recommendation": recommendation,
     }
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(session_data, f, indent=4)
-
-    print(f"✅ Chat session saved to {path}")
 
 # === USER STATE ===
 user_state = {
@@ -199,7 +192,10 @@ def handle_user_message(user_input, chat_history):
             + questions[0]["text"]
         )
         user_state["stage"] = "questions"
-        chat_history.append((user_input, bot_msg))
+        chat_history.extend([
+            {"role": "user", "content": user_input},
+            {"role": "assistant", "content": bot_msg},
+        ])
         speak(bot_msg)
         return bot_msg, chat_history
 
@@ -209,28 +205,30 @@ def handle_user_message(user_input, chat_history):
             key = question["key"]
             input_value = user_input.lower()
 
-            # Yes/No intent inference
             if question["type"] == "yesno":
                 inferred = infer_yes_no(input_value)
                 if inferred:
                     input_value = inferred
                 else:
                     bot_msg = question["error"]
-                    chat_history.append((user_input, bot_msg))
+                    chat_history.extend([
+                        {"role": "user", "content": user_input},
+                        {"role": "assistant", "content": bot_msg},
+                    ])
                     speak(bot_msg)
                     return bot_msg, chat_history
 
-            # Age validation
             if question["type"] == "int" and not question["validation"](input_value):
                 bot_msg = question["error"]
-                chat_history.append((user_input, bot_msg))
+                chat_history.extend([
+                    {"role": "user", "content": user_input},
+                    {"role": "assistant", "content": bot_msg},
+                ])
                 speak(bot_msg)
                 return bot_msg, chat_history
 
-            # Save valid input
             user_state["responses"][key] = int(input_value) if question["type"] == "int" else input_value
 
-            # Red flag → end early
             if (
                 user_state["responses"].get("fever") == "yes"
                 and user_state["responses"].get("cough") == "yes"
@@ -239,7 +237,10 @@ def handle_user_message(user_input, chat_history):
                 prompt = format_summary_prompt()
                 advice = query_openrouter(prompt)
                 user_state["stage"] = "done"
-                chat_history.append((user_input, advice))
+                chat_history.extend([
+                    {"role": "user", "content": user_input},
+                    {"role": "assistant", "content": advice},
+                ])
                 speak(advice)
                 save_chat_session(user_state["responses"], chat_history, advice)
                 return advice, chat_history
@@ -253,12 +254,18 @@ def handle_user_message(user_input, chat_history):
                 bot_msg = query_openrouter(prompt)
                 save_chat_session(user_state["responses"], chat_history, bot_msg)
 
-            chat_history.append((user_input, bot_msg))
+            chat_history.extend([
+                {"role": "user", "content": user_input},
+                {"role": "assistant", "content": bot_msg},
+            ])
             speak(bot_msg)
             return bot_msg, chat_history
 
     elif user_state["stage"] == "done":
         bot_msg = "✅ You've completed the health check. Refresh or type 'hi' to start over."
-        chat_history.append((user_input, bot_msg))
+        chat_history.extend([
+            {"role": "user", "content": user_input},
+            {"role": "assistant", "content": bot_msg},
+        ])
         speak(bot_msg)
         return bot_msg, chat_history
