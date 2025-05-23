@@ -8,7 +8,7 @@ def chat_interface(user_input, chat_history, voice_enabled):
 
 with gr.Blocks() as demo:
     gr.Markdown("## 🧠 Smart Medical Chatbot with Voice")
-    chatbot = gr.Chatbot(label="Virtual Health Assistant")
+    chatbot = gr.Chatbot(label="Virtual Health Assistant", type="messages")
     msg = gr.Textbox(placeholder="Type here and press Enter...", label="Your input")
     state = gr.State([])
     tts_toggle = gr.Checkbox(label="🔈 Enable Voice", value=True)
@@ -16,4 +16,4 @@ with gr.Blocks() as demo:
     msg.submit(chat_interface, [msg, state, tts_toggle], [chatbot, state])
     msg.submit(lambda: "", None, msg)  # Clear input after submission
 
-demo.launch()
+demo.launch(share=True)
