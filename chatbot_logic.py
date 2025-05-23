@@ -16,22 +16,48 @@ HEADERS = {
 }
 MODEL = "anthropic/claude-3-haiku"
 
-# === TTS SETUP ===
-engine = pyttsx3.init()
-engine.setProperty('rate', 180)
-tts_enabled = True
+# # === TTS SETUP ===
+# engine = pyttsx3.init()
+# engine.setProperty('rate', 180)
+# tts_enabled = True
 
-def speak(text):
-    if tts_enabled:
-        try:
-            engine.say(text)
-            engine.runAndWait()
-        except Exception as e:
-            print(f"[TTS Error] {str(e)}")
+# def speak(text):
+#     if tts_enabled:
+#         try:
+#             engine.say(text)
+#             engine.runAndWait()
+#         except Exception as e:
+#             print(f"[TTS Error] {str(e)}")
+
+# def set_tts(enabled: bool):
+#     global tts_enabled
+#     tts_enabled = enabled
+
+# speech_engine.py
+import os
+from gtts import gTTS
+from tempfile import NamedTemporaryFile
+
+tts_enabled = True
+tts_supported = os.getenv("SPACE_ENVIRONMENT") != "huggingface"
 
 def set_tts(enabled: bool):
     global tts_enabled
     tts_enabled = enabled
+
+def speak(text: str):
+    if not tts_enabled or not tts_supported:
+        return
+
+    try:
+        tts = gTTS(text)
+        with NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+            tts.save(tmp.name)
+            os.system(f"start {tmp.name}" if os.name == 'nt' else f"mpg123 {tmp.name}")
+            os.remove(tmp.name)
+    except Exception as e:
+        print(f"[TTS Error] {str(e)}")
+
 
 # === SESSION SAVE ===
 SAVE_DIR = "chat_logs"

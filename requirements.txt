@@ -1,8 +1,6 @@
 gradio
-transformers
-sentence-transformers
-langchain
-chromadb
-openai
+gTTS
+pyttsx3
 python-dotenv
 requests
+playsound==1.2.2
